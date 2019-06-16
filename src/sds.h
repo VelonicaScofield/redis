@@ -45,13 +45,13 @@ typedef char *sds;
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
  * However is here to document the layout of type 5 SDS strings. */
 struct __attribute__ ((__packed__)) sdshdr5 {
-    unsigned char flags; /* 3 lsb of type, and 5 msb of string length */
+    unsigned char flags; /* 3 lsb of type, and 5 msb of string length */ //sds5的flags还会保存字符串的长度？
     char buf[];
 };
 struct __attribute__ ((__packed__)) sdshdr8 {
-    uint8_t len; /* used */
-    uint8_t alloc; /* excluding the header and null terminator */
-    unsigned char flags; /* 3 lsb of type, 5 unused bits */
+    uint8_t len; /* used */ // 字符串真正的长度
+    uint8_t alloc; /* excluding the header and null terminator */ // 字符串的最大容量
+    unsigned char flags; /* 3 lsb of type, 5 unused bits */ // header类型
     char buf[];
 };
 struct __attribute__ ((__packed__)) sdshdr16 {
@@ -78,12 +78,17 @@ struct __attribute__ ((__packed__)) sdshdr64 {
 #define SDS_TYPE_16 2
 #define SDS_TYPE_32 3
 #define SDS_TYPE_64 4
-#define SDS_TYPE_MASK 7
+#define SDS_TYPE_MASK 7  // 类型掩码
 #define SDS_TYPE_BITS 3
-#define SDS_HDR_VAR(T,s) struct sdshdr##T *sh = (void*)((s)-(sizeof(struct sdshdr##T)));
-#define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))
-#define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS)
+#define SDS_HDR_VAR(T,s) struct sdshdr##T *sh = (void*)((s)-(sizeof(struct sdshdr##T))); // 获取header头指针，##起连接作用如果sdshdr##8就是sdshdr8
+#define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T)))) // 获取header头指针
+#define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS) // 获取sdshr5的长度
 
+/**
+ * 用来计算sds中实际使用的长度
+ * @param s
+ * @return
+ */
 static inline size_t sdslen(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -101,6 +106,11 @@ static inline size_t sdslen(const sds s) {
     return 0;
 }
 
+/**
+ * 计算sds的剩余空间
+ * @param s
+ * @return
+ */
 static inline size_t sdsavail(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -127,6 +137,11 @@ static inline size_t sdsavail(const sds s) {
     return 0;
 }
 
+/**
+ * 修改sds中数组的实际长度
+ * @param s
+ * @param newlen
+ */
 static inline void sdssetlen(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -151,6 +166,11 @@ static inline void sdssetlen(sds s, size_t newlen) {
     }
 }
 
+/**
+ * 增量修改实际长度
+ * @param s
+ * @param inc
+ */
 static inline void sdsinclen(sds s, size_t inc) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -176,6 +196,11 @@ static inline void sdsinclen(sds s, size_t inc) {
     }
 }
 
+/**
+ * 获取sds的最大容量
+ * @param s
+ * @return
+ */
 /* sdsalloc() = sdsavail() + sdslen() */
 static inline size_t sdsalloc(const sds s) {
     unsigned char flags = s[-1];
@@ -194,6 +219,11 @@ static inline size_t sdsalloc(const sds s) {
     return 0;
 }
 
+/**
+ * 修改sds的最大容量
+ * @param s
+ * @param newlen
+ */
 static inline void sdssetalloc(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -215,15 +245,58 @@ static inline void sdssetalloc(sds s, size_t newlen) {
     }
 }
 
+/**
+ * 创建sds
+ * @param init
+ * @param initlen
+ * @return
+ */
 sds sdsnewlen(const void *init, size_t initlen);
 sds sdsnew(const char *init);
+/**
+ * 清空sds
+ * @return
+ */
 sds sdsempty(void);
+
+/**
+ * 复制sds
+ * @param s
+ * @return
+ */
 sds sdsdup(const sds s);
+/**
+ * 释放sds
+ * @param s
+ */
 void sdsfree(sds s);
+
+/**
+ * 扩展字符串到指定长度
+ * @param s
+ * @param len
+ * @return
+ */
 sds sdsgrowzero(sds s, size_t len);
+
+/**
+ * sds连接函数
+ * @param s
+ * @param t
+ * @param len
+ * @return
+ */
 sds sdscatlen(sds s, const void *t, size_t len);
 sds sdscat(sds s, const char *t);
 sds sdscatsds(sds s, const sds t);
+
+/**
+ * 复制字符串
+ * @param s
+ * @param t
+ * @param len
+ * @return
+ */
 sds sdscpylen(sds s, const char *t, size_t len);
 sds sdscpy(sds s, const char *t);
 
@@ -235,8 +308,21 @@ sds sdscatprintf(sds s, const char *fmt, ...)
 sds sdscatprintf(sds s, const char *fmt, ...);
 #endif
 
+/**
+ * sds格式话输出
+ * @param s
+ * @param fmt
+ * @param ...
+ * @return
+ */
 sds sdscatfmt(sds s, char const *fmt, ...);
 sds sdstrim(sds s, const char *cset);
+/**
+ * sds截取
+ * @param s
+ * @param start
+ * @param end
+ */
 void sdsrange(sds s, ssize_t start, ssize_t end);
 void sdsupdatelen(sds s);
 void sdsclear(sds s);
@@ -249,12 +335,31 @@ sds sdsfromlonglong(long long value);
 sds sdscatrepr(sds s, const char *p, size_t len);
 sds *sdssplitargs(const char *line, int *argc);
 sds sdsmapchars(sds s, const char *from, const char *to, size_t setlen);
+/**
+ * 拼接字符串，以连字符
+ * @param argv
+ * @param argc
+ * @param sep
+ * @return
+ */
 sds sdsjoin(char **argv, int argc, char *sep);
 sds sdsjoinsds(sds *argv, int argc, const char *sep, size_t seplen);
 
+/**
+ * sds动态调整函数
+ * @param s
+ * @param addlen
+ * @return
+ */
 /* Low level functions exposed to the user API */
 sds sdsMakeRoomFor(sds s, size_t addlen);
 void sdsIncrLen(sds s, ssize_t incr);
+
+/**
+ * 用来新申请一个小一点的内存空间，把原来的sds的内容拷贝到新空间，用于压缩内存
+ * @param s
+ * @return
+ */
 sds sdsRemoveFreeSpace(sds s);
 size_t sdsAllocSize(sds s);
 void *sdsAllocPtr(sds s);
